@@ -35,10 +35,10 @@ class App:
     async def _patients_worker(self, name: str, queue: asyncio.Queue) -> None:
         logger.info(f"Worker {name} START")
 
-        async with self.pool.acquire() as conn:
+        async with self._pool.acquire() as conn:
             while True:
                 item = await queue.get()
-                await self.batcher.process(conn, item)
+                await self._batcher.process(conn, item)
                 queue.task_done()
 
     async def _prepare_patients_data(self, queue: asyncio.Queue) -> None:
@@ -52,17 +52,17 @@ class App:
                     await queue.put(chunk)
 
     async def main(self) -> None:
-        self.pool = await asyncpgsa.create_pool(
-            host=settings['POSTGRES_DATABASE_HOST'],
-            database=settings['POSTGRES_DATABASE_NAME'],
-            user=settings['POSTGRES_DATABASE_USERNAME'],
-            password=settings['POSTGRES_DATABASE_PASSWORD'],
-            max_size=settings['POSTGRES_CONNECTION_POOL_SIZE'],
+        self._pool = await asyncpgsa.create_pool(
+            host=self._settings['POSTGRES_DATABASE_HOST'],
+            database=self._settings['POSTGRES_DATABASE_NAME'],
+            user=self._settings['POSTGRES_DATABASE_USERNAME'],
+            password=self._settings['POSTGRES_DATABASE_PASSWORD'],
+            max_size=self._settings['POSTGRES_CONNECTION_POOL_SIZE'],
             loop=self._loop,
         )
 
-        self.batcher = patients.Batching(self.pool, self._settings)
-        batcher_task = asyncio.create_task(self.batcher.work())
+        self._batcher = patients.Batching(self._pool, self._settings)
+        batcher_task = asyncio.create_task(self._batcher.work())
 
         tasks = []
         for i in range(self._settings['QUEUE_WORKERS_AMOUNT']):
@@ -79,7 +79,7 @@ class App:
             task.cancel()
 
         batcher_task.cancel()
-        await self.batcher.save_batch()
+        await self._batcher.save_batch()
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
