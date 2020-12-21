@@ -35,6 +35,6 @@ async def main() -> None:
     await prepare_patients_data()
 
 
-if __name__ == '__main__':
+def start() -> None:
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
