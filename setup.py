@@ -9,6 +9,9 @@ setup(
     """,
     install_requires=[
         'aiohttp',
+        'asyncpg',
+        'python-dotenv',
+        'SQLAlchemy',
     ],
     extras_require={
         'dev': [
