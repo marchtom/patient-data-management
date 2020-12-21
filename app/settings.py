@@ -1,0 +1,13 @@
+import os
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
+POSTGRES_DATABASE_USERNAME = os.getenv("POSTGRES_DATABASE_USERNAME", "postgres")
+POSTGRES_DATABASE_PASSWORD = os.getenv("POSTGRES_DATABASE_PASSWORD", "postgres")
+POSTGRES_DATABASE_NAME = os.getenv("POSTGRES_DATABASE_NAME", "db1")
+POSTGRES_DATABASE_PORT = int(os.getenv("POSTGRES_DATABASE_PORT", 5432))
+POSTGRES_DATABASE_HOST = os.getenv("POSTGRES_DATABASE_HOST", "localhost")
