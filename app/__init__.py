@@ -5,7 +5,6 @@ import time
 import aiohttp
 import asyncpgsa
 
-
 from .tables import patients
 from .settings import settings
 
