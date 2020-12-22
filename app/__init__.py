@@ -35,7 +35,7 @@ class App:
         async with self._pool.acquire() as conn:
             while True:
                 item = await queue.get()
-                await self._batcher.process(conn, item)
+                await self._patients_batcher.process(conn, item)
                 queue.task_done()
 
     async def _prepare_patients_data(self, queue: asyncio.Queue) -> None:
@@ -59,8 +59,8 @@ class App:
             loop=self._loop,
         )
 
-        self._batcher = patients.Batching(self._pool, self._settings)
-        batcher_task = self._loop.create_task(self._batcher.work())
+        self._patients_batcher = patients.PatientsBatching(self._pool, self._settings)
+        batcher_task = self._loop.create_task(self._patients_batcher.work())
 
         tasks = []
         for i in range(self._settings['QUEUE_WORKERS_AMOUNT']):
@@ -76,7 +76,7 @@ class App:
         for task in tasks:
             task.cancel()
 
-        await self._batcher.proccess_batch()
+        await self._patients_batcher.proccess_batch()
         batcher_task.cancel()
 
         await asyncio.gather(*tasks, batcher_task, return_exceptions=True)
