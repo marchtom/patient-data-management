@@ -1,5 +1,3 @@
-import asyncio
-import copy
 import json
 import logging
 from datetime import datetime
@@ -10,6 +8,7 @@ from asyncpg.connection import Connection
 from asyncpg.pool import Pool
 from sqlalchemy.dialects import postgresql
 
+from .basic_batcher import Batcher
 from .db import metadata
 
 
@@ -34,36 +33,10 @@ RACE_CODE_URL: Final = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-
 ETHNICITY_CODE_URL: Final = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity"
 
 
-class Batching:
+class PatientsBatching(Batcher):
 
     def __init__(self, pool: Pool, settings: dict) -> None:
-        self._valid_patients_batch: List[dict] = []
-        self._pool = pool
-        self.settings = settings
-        self.total_records_real = 0
-
-    async def work(self) -> None:
-        while True:
-            await self.proccess_batch()
-            await asyncio.sleep(self.settings['BATCHER_SLEEP_TIME'])
-
-    async def proccess_batch(self) -> None:
-        if self._valid_patients_batch:
-            valid_patients_list = copy.deepcopy(self._valid_patients_batch)
-            del self._valid_patients_batch[:]
-            query = (
-                patients_table.insert()
-                .values(valid_patients_list)
-            )
-            async with self._pool.acquire() as conn:
-                res = await conn.execute(query)
-            res_split = res.split()
-            real_insert_count = res_split[2]
-            self.total_records_real += int(real_insert_count)
-            logger.debug(
-                "REAL %s patients records saved in this batch, total: %s",
-                real_insert_count, self.total_records_real,
-            )
+        super().__init__(pool, settings, patients_table)
 
     @staticmethod
     def _find_code(extension: List[Any], url: str) -> Tuple[Optional[str], Optional[str]]:
@@ -112,10 +85,14 @@ class Batching:
             country = None
 
         # race_code is optional
-        race_code, race_code_system = Batching._find_code(patient.get('extension'), RACE_CODE_URL)
+        race_code, race_code_system = PatientsBatching._find_code(
+            patient.get('extension'), RACE_CODE_URL,
+        )
 
         # ethnicity_code is optional
-        ethnicity_code, ethnicity_code_system = Batching._find_code(patient.get('extension'), ETHNICITY_CODE_URL)
+        ethnicity_code, ethnicity_code_system = PatientsBatching._find_code(
+            patient.get('extension'), ETHNICITY_CODE_URL,
+        )
 
         valid_patient = {
             'source_id': str(source_id),
@@ -128,4 +105,4 @@ class Batching:
             'ethnicity_code_system': ethnicity_code_system,
         }
 
-        self._valid_patients_batch.append(valid_patient)
+        self._valid_batch.append(valid_patient)
