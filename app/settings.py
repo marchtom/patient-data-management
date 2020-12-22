@@ -9,6 +9,7 @@ settings = dict(
     PATIENTS_PATH="https://raw.githubusercontent.com/smart-on-fhir/flat-fhir-files/master/r3/Patient.ndjson",
     ENCOUNTERS_PATH="https://raw.githubusercontent.com/smart-on-fhir/flat-fhir-files/master/r3/Encounter.ndjson",
     PROCEDURES_PATH="https://raw.githubusercontent.com/smart-on-fhir/flat-fhir-files/master/r3/Procedure.ndjson",
+    OBSERVATIONS_PATH="https://raw.githubusercontent.com/smart-on-fhir/flat-fhir-files/master/r3/Observation.ndjson",
 
     POSTGRES_DATABASE_USERNAME=os.getenv("POSTGRES_DATABASE_USERNAME", "postgres"),
     POSTGRES_DATABASE_PASSWORD=os.getenv("POSTGRES_DATABASE_PASSWORD", "postgres"),
