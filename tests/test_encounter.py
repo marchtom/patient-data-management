@@ -31,7 +31,6 @@ async def test_encounters_single_item_payload(
     await run_encounters_test(loop, payload)
 
     data = get_data("encounters")
-    print(data)
 
     assert len(data) == 1
     assert data[0]["source_id"] == payload[0]["id"]
