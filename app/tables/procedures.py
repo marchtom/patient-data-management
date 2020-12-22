@@ -45,14 +45,14 @@ class ProceduresBatching(Batcher):
         super().__init__(pool, settings, procedures_table)
 
     @staticmethod
-    def _find_code(code_: List[Any]) -> Tuple[Optional[str], Optional[str]]:
+    def _find_code(code_: Optional[dict]) -> Tuple[Optional[str], Optional[str]]:
         if not code_:
             return None, None
 
         try:
             coding = code_.get("coding")
-            code = coding[0].get("code")
-            system = coding[0].get("system")
+            code = coding[0].get("code")  # type: ignore
+            system = coding[0].get("system")  # type: ignore
             return code, system
         except (AttributeError, IndexError):
             return None, None
