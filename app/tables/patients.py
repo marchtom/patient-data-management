@@ -40,7 +40,6 @@ class Batching:
         self._valid_patients_batch: List[dict] = []
         self._pool = pool
         self.settings = settings
-        self.total_records_seen = 0
         self.total_records_real = 0
 
     async def work(self) -> None:
@@ -52,25 +51,19 @@ class Batching:
         if self._valid_patients_batch:
             valid_patients_list = copy.deepcopy(self._valid_patients_batch)
             del self._valid_patients_batch[:]
+            query = (
+                patients_table.insert()
+                .values(valid_patients_list)
+            )
             async with self._pool.acquire() as conn:
-                query = (
-                    patients_table.insert()
-                    .values(valid_patients_list)
-                )
-                records_count = len(valid_patients_list)
-                self.total_records_seen += records_count
-                logger.debug(
-                    "%s patients records saved in this batch, total: %s",
-                    records_count, self.total_records_seen,
-                )
                 res = await conn.execute(query)
-                res_split = res.split()
-                real_insert_count = res_split[2]
-                self.total_records_real += int(real_insert_count)
-                logger.debug(
-                    "REAL %s patients records saved in this batch, total: %s",
-                    real_insert_count, self.total_records_real,
-                )
+            res_split = res.split()
+            real_insert_count = res_split[2]
+            self.total_records_real += int(real_insert_count)
+            logger.debug(
+                "REAL %s patients records saved in this batch, total: %s",
+                real_insert_count, self.total_records_real,
+            )
 
     @staticmethod
     def _find_code(extension: List[Any], url: str) -> Tuple[Optional[str], Optional[str]]:
@@ -78,6 +71,8 @@ class Batching:
             return None, None
 
         for item in extension:
+            if not hasattr(item, "get"):
+                continue
             if item.get('url') == url:
                 # we can expect missing keys or empty lists at this point
                 try:
@@ -107,7 +102,7 @@ class Batching:
         # birth_date is optional, but might be invalid
         try:
             birth_date: Optional[datetime] = datetime.strptime(patient.get('birthDate'), '%Y-%m-%d')
-        except ValueError:
+        except (ValueError, TypeError):
             birth_date = None
 
         # address is optional
@@ -123,7 +118,7 @@ class Batching:
         ethnicity_code, ethnicity_code_system = Batching._find_code(patient.get('extension'), ETHNICITY_CODE_URL)
 
         valid_patient = {
-            'source_id': source_id,
+            'source_id': str(source_id),
             'birth_date': birth_date,
             'gender': patient.get('gender'),
             'country': country,
