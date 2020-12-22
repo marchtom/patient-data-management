@@ -41,3 +41,6 @@ class Batcher:
                 "REAL %s patients records saved in this batch, total: %s",
                 real_insert_count, self.total_records_real,
             )
+
+    def process(self) -> None:
+        raise NotImplementedError
