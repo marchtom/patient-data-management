@@ -1,6 +1,6 @@
-import datetime
 import json
 import logging
+import datetime
 from typing import Any, List, Optional, Tuple
 
 import sqlalchemy as sa
@@ -12,14 +12,14 @@ from sqlalchemy.dialects import postgresql
 from .basic_batcher import Batcher
 from .db import metadata
 
-from . import patients
+from . import encounters, patients
 
 
 logger = logging.getLogger(__name__)
 
 
-encounters_table = sa.Table(
-    'encounters', metadata,
+procedures_table = sa.Table(
+    'procedures', metadata,
     sa.Column('id', postgresql.INTEGER, primary_key=True),
     sa.Column('source_id', postgresql.TEXT, nullable=False),
     sa.Column(
@@ -28,34 +28,29 @@ encounters_table = sa.Table(
         sa.ForeignKey('patients.id'),
         nullable=False,
     ),
-    sa.Column('start_date', postgresql.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('end_date', postgresql.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('type_code', postgresql.TEXT),
-    sa.Column('type_code_system', postgresql.TEXT),
+    sa.Column(
+        'encounter_id',
+        postgresql.INTEGER,
+        sa.ForeignKey('encounters.id'),
+    ),
+    sa.Column('procedure_date', postgresql.DATE, nullable=False),
+    sa.Column('type_code', postgresql.TEXT, nullable=False),
+    sa.Column('type_code_system', postgresql.TEXT, nullable=False),
 )
 
 
-async def get_encounter_id(conn: Connection, source_id: str) -> str:
-    query = (
-        encounters_table.select()
-        .where(encounters_table.c.source_id == source_id)
-        .with_only_columns([encounters_table.c.id])
-    )
-    return await conn.fetchval(query)
-
-
-class EncountersBatching(Batcher):
+class ProceduresBatching(Batcher):
 
     def __init__(self, pool: Pool, settings: dict) -> None:
-        super().__init__(pool, settings, encounters_table)
+        super().__init__(pool, settings, procedures_table)
 
     @staticmethod
-    def _find_code(type_: List[Any]) -> Tuple[Optional[str], Optional[str]]:
-        if not type_:
+    def _find_code(code_: List[Any]) -> Tuple[Optional[str], Optional[str]]:
+        if not code_:
             return None, None
 
         try:
-            coding = type_[0].get("coding")
+            coding = code_.get("coding")
             code = coding[0].get("code")
             system = coding[0].get("system")
             return code, system
@@ -70,21 +65,26 @@ class EncountersBatching(Batcher):
         async with self._pool.acquire() as conn:
             return await patients.get_patient_id(conn, patient_id_reference)
 
+    @cached(ttl=30)  # type: ignore
+    async def get_encounter_id(self, encounter_id_reference: str) -> str:
+        async with self._pool.acquire() as conn:
+            return await encounters.get_encounter_id(conn, encounter_id_reference)
+
     async def process(self, conn: Connection, item: str) -> None:
 
         # skip items that are not valid JSON
         try:
-            encounter = json.loads(item)
+            procedure = json.loads(item)
         except json.JSONDecodeError:
             logger.info("invalid JSON")
             return
 
         # source_id is required
-        if (source_id := encounter.get('id')) is None:
+        if (source_id := procedure.get('id')) is None:
             return
 
         # patient_id is required
-        if (subject := encounter.get("subject")) is None:
+        if (subject := procedure.get("subject")) is None:
             return
         else:
             if (patient_id_reference := subject.get("reference")) is None:
@@ -95,29 +95,35 @@ class EncountersBatching(Batcher):
         if not (patient_id := await self.get_patient_id(patient_id_reference)):
             return
 
-        # start_date and end_date are required
-        if (period := encounter.get("period")) is None:
-            return
-        else:
-            start_date_str = period.get("start")
-            end_date_str = period.get("end")
-            if start_date_str and end_date_str:
-                try:
-                    start_date = datetime.datetime.fromisoformat(start_date_str)
-                    end_date = datetime.datetime.fromisoformat(end_date_str)
-                except (TypeError, ValueError):
-                    return
-            else:
-                return
+        # encounter_id is optional
+        encounter_id = None
+        if (subject := procedure.get("context")) is not None:
+            if (encounter_id_reference := subject.get("reference")) is not None:
+                encounter_id_reference = encounter_id_reference.replace("Encounter/", "")
+                encounter_id = await self.get_encounter_id(encounter_id_reference)
 
-        # type_code and type_code_system are optional
-        type_code, type_code_system = EncountersBatching._find_code(encounter.get("type"))
+        # procedure_date is required
+        if (procedure_date_raw := procedure.get("performedDateTime")) is None:
+            if (performed_period := procedure.get("performedPeriod")) is None:
+                return
+            else:
+                procedure_date_raw = performed_period.get("start")
+
+        try:
+            procedure_date = datetime.datetime.fromisoformat(procedure_date_raw)
+        except ValueError:
+            return
+
+        # type_code and type_code_system are required
+        type_code, type_code_system = ProceduresBatching._find_code(procedure.get("code"))
+        if type_code is None or type_code_system is None:
+            return
 
         valid_encounter = {
             'source_id': str(source_id),
             'patient_id': patient_id,
-            'start_date': start_date,
-            'end_date': end_date,
+            'encounter_id': encounter_id,
+            'procedure_date': procedure_date,
             'type_code': type_code,
             'type_code_system': type_code_system,
         }

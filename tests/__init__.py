@@ -66,12 +66,16 @@ async def run_app(
         body = ndjson.dumps(payload)
         mocked.get(mock_url, status=200, body=body)
         test_app = init_app(loop=loop, settings=settings)
+
         if entity == "patients":
             task = loop.create_task(test_app.resolve_patients())
         elif entity == "encounters":
             task = loop.create_task(test_app.resolve_encounters())
+        elif entity == "procedures":
+            task = loop.create_task(test_app.resolve_procedures())
         else:
             raise ValueError("unknown entity")
+
         await asyncio.sleep(SLEEP_PERIOD)
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
@@ -98,6 +102,27 @@ async def run_encounters_test(loop: asyncio.AbstractEventLoop, payload: List[dic
 
     await run_app(
         loop, payload, "encounters", mock_url=settings['ENCOUNTERS_PATH']
+    )
+
+
+async def run_procedures_test(loop: asyncio.AbstractEventLoop, payload: List[dict]) -> None:
+    # add patients and encounters seeds
+    with psycopg2.connect(
+        database=settings['POSTGRES_DATABASE_NAME'],
+        host=settings['POSTGRES_DATABASE_HOST'],
+        user=settings['POSTGRES_DATABASE_USERNAME'],
+        password=settings['POSTGRES_DATABASE_PASSWORD'],
+    ) as conn:
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        with open("tests/seed/patients.sql", "r") as f:
+            cur1 = conn.cursor()
+            cur1.execute(f.read())
+        with open("tests/seed/encounters.sql", "r") as f:
+            cur2 = conn.cursor()
+            cur2.execute(f.read())
+
+    await run_app(
+        loop, payload, "procedures", mock_url=settings['PROCEDURES_PATH']
     )
 
 

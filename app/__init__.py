@@ -7,7 +7,7 @@ import aiohttp
 import asyncpgsa
 from asyncpg.pool import Pool
 
-from .tables import encounters, patients
+from .tables import encounters, patients, procedures
 from .tables.basic_batcher import Batcher
 from .settings import settings
 
@@ -99,6 +99,13 @@ class App:
         batcher: encounters.EncountersBatching = encounters.EncountersBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['ENCOUNTERS_PATH'], pool)
 
+    async def resolve_procedures(self, pool: Optional[Pool] = None) -> None:
+        if pool is None:
+            pool = await self.create_pool()
+
+        batcher: procedures.ProceduresBatching = procedures.ProceduresBatching(pool, self._settings)
+        await self._resolve_data(batcher, self._settings['PROCEDURES_PATH'], pool)
+
     async def main(self) -> None:
         pool = await self.create_pool()
 
@@ -109,6 +116,10 @@ class App:
         started_at = time.monotonic()
         await self.resolve_encounters(pool)
         logger.info(f"Encounters resolving time: {(time.monotonic() - started_at):.4f} s")
+
+        started_at = time.monotonic()
+        await self.resolve_procedures(pool)
+        logger.info(f"Procedures resolving time: {(time.monotonic() - started_at):.4f} s")
 
 
 def init_app(loop: asyncio.AbstractEventLoop, settings: dict) -> App:
