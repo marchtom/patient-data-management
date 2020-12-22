@@ -60,7 +60,7 @@ class App:
         )
 
         self._batcher = patients.Batching(self._pool, self._settings)
-        asyncio.create_task(self._batcher.work())
+        batcher_task = asyncio.create_task(self._batcher.work())
 
         tasks = []
         for i in range(self._settings['QUEUE_WORKERS_AMOUNT']):
@@ -77,7 +77,7 @@ class App:
             task.cancel()
 
         await self._batcher.proccess_batch()
-
+        batcher_task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
