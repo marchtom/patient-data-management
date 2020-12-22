@@ -1,7 +1,7 @@
 import json
 import logging
 import datetime
-from typing import Any, List, Optional, Tuple
+from typing import Optional, Tuple
 
 import sqlalchemy as sa
 from aiocache import cached
