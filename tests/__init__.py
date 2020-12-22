@@ -73,6 +73,8 @@ async def run_app(
             task = loop.create_task(test_app.resolve_encounters())
         elif entity == "procedures":
             task = loop.create_task(test_app.resolve_procedures())
+        elif entity == "observations":
+            task = loop.create_task(test_app.resolve_observations())
         else:
             raise ValueError("unknown entity")
 
@@ -123,6 +125,27 @@ async def run_procedures_test(loop: asyncio.AbstractEventLoop, payload: List[dic
 
     await run_app(
         loop, payload, "procedures", mock_url=settings['PROCEDURES_PATH']
+    )
+
+
+async def run_observations_test(loop: asyncio.AbstractEventLoop, payload: List[dict]) -> None:
+    # add patients and encounters seeds
+    with psycopg2.connect(
+        database=settings['POSTGRES_DATABASE_NAME'],
+        host=settings['POSTGRES_DATABASE_HOST'],
+        user=settings['POSTGRES_DATABASE_USERNAME'],
+        password=settings['POSTGRES_DATABASE_PASSWORD'],
+    ) as conn:
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        with open("tests/seed/patients.sql", "r") as f:
+            cur1 = conn.cursor()
+            cur1.execute(f.read())
+        with open("tests/seed/encounters.sql", "r") as f:
+            cur2 = conn.cursor()
+            cur2.execute(f.read())
+
+    await run_app(
+        loop, payload, "observations", mock_url=settings['OBSERVATIONS_PATH']
     )
 
 
