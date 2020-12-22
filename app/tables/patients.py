@@ -33,6 +33,15 @@ RACE_CODE_URL: Final = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-
 ETHNICITY_CODE_URL: Final = "http://hl7.org/fhir/us/core/StructureDefinition/us-core-ethnicity"
 
 
+async def get_patient_id(conn: Connection, source_id: str) -> str:
+    query = (
+        patients_table.select()
+        .where(patients_table.c.source_id == source_id)
+        .with_only_columns([patients_table.c.id])
+    )
+    return await conn.fetchval(query)
+
+
 class PatientsBatching(Batcher):
 
     def __init__(self, pool: Pool, settings: dict) -> None:

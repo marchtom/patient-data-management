@@ -5,19 +5,19 @@ import pytest
 from app.tables.patients import ETHNICITY_CODE_URL, RACE_CODE_URL
 
 
-from . import run_app, get_data
+from . import run_patients_test, get_data
 
 
 @pytest.mark.asyncio
 async def test_patients_single_item_basic_payload(
-    database: pytest.fixture,
+    database,
     loop: AbstractEventLoop,
 ) -> None:
     payload = [{"id": "2"}]
 
-    await run_app(loop, payload)
+    await run_patients_test(loop, payload)
 
-    data = get_data()
+    data = get_data("patients")
 
     assert len(data) == 1
     assert data[0]["source_id"] == payload[0]["id"]
@@ -25,21 +25,21 @@ async def test_patients_single_item_basic_payload(
 
 @pytest.mark.asyncio
 async def test_patients_invalid_payload_missing_id(
-    database: pytest.fixture,
+    database,
     loop: AbstractEventLoop,
 ) -> None:
     payload = [{"invalid_key": "2"}]
 
-    await run_app(loop, payload)
+    await run_patients_test(loop, payload)
 
-    data = get_data()
+    data = get_data("patients")
 
     assert len(data) == 0
 
 
 @pytest.mark.asyncio
 async def test_patients_invalid_optional_payload(
-    database: pytest.fixture,
+    database,
     loop: AbstractEventLoop,
 ) -> None:
     payload = [{
@@ -48,9 +48,9 @@ async def test_patients_invalid_optional_payload(
         "extension": {"key": "val"},
     }]
 
-    await run_app(loop, payload)
+    await run_patients_test(loop, payload)
 
-    data = get_data()
+    data = get_data("patients")
 
     assert len(data) == 1
     assert data[0]["source_id"] == payload[0]["id"]
@@ -61,7 +61,7 @@ async def test_patients_invalid_optional_payload(
 
 @pytest.mark.asyncio
 async def test_patients_single_item_complex_payload(
-    database: pytest.fixture,
+    database,
     loop: AbstractEventLoop,
 ) -> None:
     country = "UK"
@@ -101,9 +101,9 @@ async def test_patients_single_item_complex_payload(
         ]
     }]
 
-    await run_app(loop, payload)
+    await run_patients_test(loop, payload)
 
-    data = get_data()
+    data = get_data("patients")
 
     assert len(data) == 1
     assert data[0]["source_id"] == payload[0]["id"]
@@ -117,14 +117,14 @@ async def test_patients_single_item_complex_payload(
 
 @pytest.mark.asyncio
 async def test_patients_multiple_items_basic_payload(
-    database: pytest.fixture,
+    database,
     loop: AbstractEventLoop,
 ) -> None:
     payload = [{"id": "2"}, {"id": "uuid-abcd12"}, {"id": 9724}]
 
-    await run_app(loop, payload)
+    await run_patients_test(loop, payload)
 
-    data = get_data()
+    data = get_data("patients")
 
     assert len(data) == len(payload)
     payload_source_ids = [item["id"] for item in payload]
@@ -135,14 +135,14 @@ async def test_patients_multiple_items_basic_payload(
 
 @pytest.mark.asyncio
 async def test_patients_multiple_items_single_invalid_id(
-    database: pytest.fixture,
+    database,
     loop: AbstractEventLoop,
 ) -> None:
     payload = [{"id": "2jas"}, {"not_id": "1111-uuid-abcd12"}, {"id": 900724}]
 
-    await run_app(loop, payload)
+    await run_patients_test(loop, payload)
 
-    data = get_data()
+    data = get_data("patients")
 
     payload_source_ids = [item.get("id") for item in payload if item.get("id")]
     assert len(data) == len(payload_source_ids)

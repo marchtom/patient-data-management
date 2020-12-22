@@ -4,6 +4,7 @@ import logging
 from typing import List
 
 import sqlalchemy as sa
+from asyncpg.connection import Connection
 from asyncpg.pool import Pool
 
 
@@ -38,9 +39,9 @@ class Batcher:
             real_insert_count = res_split[2]
             self.total_records_real += int(real_insert_count)
             logger.debug(
-                "REAL %s patients records saved in this batch, total: %s",
+                "%s records in this batch, total: %s",
                 real_insert_count, self.total_records_real,
             )
 
-    def process(self) -> None:
+    async def process(self, conn: Connection, item: str) -> None:
         raise NotImplementedError

@@ -1,11 +1,14 @@
 import asyncio
 import logging
 import time
+from typing import Optional
 
 import aiohttp
 import asyncpgsa
+from asyncpg.pool import Pool
 
-from .tables import patients
+from .tables import encounters, patients
+from .tables.basic_batcher import Batcher
 from .settings import settings
 
 
@@ -24,32 +27,55 @@ class App:
     def _config_logging(self) -> None:
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
+        ch.setLevel(logging.DEBUG)
         formatter = logging.Formatter('[%(asctime)s - %(name)s - %(levelname)s] %(message)s')
         ch.setFormatter(formatter)
         logger.addHandler(ch)
 
-    async def _patients_worker(self, name: str, queue: asyncio.Queue) -> None:
-        logger.info(f"Worker {name} START")
+    async def _worker(self, name: str, queue: asyncio.Queue, batcher: Batcher, pool: Pool) -> None:
+        logger.debug(f"Worker {name} START")
 
-        async with self._pool.acquire() as conn:
+        async with pool.acquire() as conn:
             while True:
                 item = await queue.get()
-                await self._patients_batcher.process(conn, item)
+                await batcher.process(conn, item)
                 queue.task_done()
 
-    async def _prepare_patients_data(self, queue: asyncio.Queue) -> None:
+    async def _prepare_data(self, queue: asyncio.Queue, url: str) -> None:
         async with aiohttp.ClientSession(loop=self._loop) as session:
-            async with session.get(self._settings['PATIENTS_PATH']) as response:
+            async with session.get(url) as response:
                 while True:
                     chunk = await response.content.readline()
                     if not chunk:
-                        logger.info("EOF reached")
+                        logger.debug("EOF reached")
                         break
                     await queue.put(chunk)
 
-    async def main(self) -> None:
-        self._pool = await asyncpgsa.create_pool(
+    async def _resolve_data(self, batcher: Batcher, url: str, pool: Pool) -> None:
+
+        batcher_task = self._loop.create_task(batcher.work())
+
+        tasks = []
+        for i in range(self._settings['QUEUE_WORKERS_AMOUNT']):
+            task = self._loop.create_task(
+                self._worker(f'queue-{i}', self._queue, batcher, pool)
+            )
+            tasks.append(task)
+
+        await self._prepare_data(self._queue, url)
+
+        await self._queue.join()
+
+        for task in tasks:
+            task.cancel()
+
+        await batcher.proccess_batch()
+        batcher_task.cancel()
+
+        await asyncio.gather(*tasks, batcher_task, return_exceptions=True)
+
+    async def create_pool(self) -> Pool:
+        return await asyncpgsa.create_pool(
             host=self._settings['POSTGRES_DATABASE_HOST'],
             database=self._settings['POSTGRES_DATABASE_NAME'],
             user=self._settings['POSTGRES_DATABASE_USERNAME'],
@@ -59,27 +85,30 @@ class App:
             loop=self._loop,
         )
 
-        self._patients_batcher = patients.PatientsBatching(self._pool, self._settings)
-        batcher_task = self._loop.create_task(self._patients_batcher.work())
+    async def resolve_patients(self, pool: Optional[Pool] = None) -> None:
+        if pool is None:
+            pool = await self.create_pool()
 
-        tasks = []
-        for i in range(self._settings['QUEUE_WORKERS_AMOUNT']):
-            task = self._loop.create_task(
-                self._patients_worker(f'queue-worker-{i}', self._queue)
-            )
-            tasks.append(task)
+        batcher: patients.PatientsBatching = patients.PatientsBatching(pool, self._settings)
+        await self._resolve_data(batcher, self._settings['PATIENTS_PATH'], pool)
 
-        await self._prepare_patients_data(self._queue)
+    async def resolve_encounters(self, pool: Optional[Pool] = None) -> None:
+        if pool is None:
+            pool = await self.create_pool()
 
-        await self._queue.join()
+        batcher: encounters.EncountersBatching = encounters.EncountersBatching(pool, self._settings)
+        await self._resolve_data(batcher, self._settings['ENCOUNTERS_PATH'], pool)
 
-        for task in tasks:
-            task.cancel()
+    async def main(self) -> None:
+        pool = await self.create_pool()
 
-        await self._patients_batcher.proccess_batch()
-        batcher_task.cancel()
+        started_at = time.monotonic()
+        await self.resolve_patients(pool)
+        logger.info(f"Patients resolving time: {(time.monotonic() - started_at):.4f} s")
 
-        await asyncio.gather(*tasks, batcher_task, return_exceptions=True)
+        started_at = time.monotonic()
+        await self.resolve_encounters(pool)
+        logger.info(f"Encounters resolving time: {(time.monotonic() - started_at):.4f} s")
 
 
 def init_app(loop: asyncio.AbstractEventLoop, settings: dict) -> App:

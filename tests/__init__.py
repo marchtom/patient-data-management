@@ -5,10 +5,14 @@ import ndjson
 import psycopg2
 import psycopg2.extras
 from aioresponses import aioresponses
+from psycopg2 import sql
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from app import init_app
 from app.settings import settings
+
+
+SLEEP_PERIOD = 1
 
 
 def create_database(settings: dict) -> None:
@@ -51,19 +55,53 @@ def init_database_schema(settings: dict) -> None:
         cur2.execute(f.read())
 
 
-async def run_app(loop: asyncio.AbstractEventLoop, payload: List[dict]) -> None:
+async def run_app(
+    loop: asyncio.AbstractEventLoop,
+    payload: List[dict],
+    entity: str,
+    mock_url: str,
+) -> None:
     asyncio.set_event_loop(loop)
     with aioresponses() as mocked:
         body = ndjson.dumps(payload)
-        mocked.get(settings['PATIENTS_PATH'], status=200, body=body)
+        mocked.get(mock_url, status=200, body=body)
         test_app = init_app(loop=loop, settings=settings)
-        task = loop.create_task(test_app.main())
-        await asyncio.sleep(1)
+        if entity == "patients":
+            task = loop.create_task(test_app.resolve_patients())
+        elif entity == "encounters":
+            task = loop.create_task(test_app.resolve_encounters())
+        else:
+            raise ValueError("unknown entity")
+        await asyncio.sleep(SLEEP_PERIOD)
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
 
-def get_data() -> dict:
+async def run_patients_test(loop: asyncio.AbstractEventLoop, payload: List[dict]) -> None:
+    await run_app(
+        loop, payload, "patients", mock_url=settings['PATIENTS_PATH']
+    )
+
+
+async def run_encounters_test(loop: asyncio.AbstractEventLoop, payload: List[dict]) -> None:
+    # add patients seeds
+    with psycopg2.connect(
+        database=settings['POSTGRES_DATABASE_NAME'],
+        host=settings['POSTGRES_DATABASE_HOST'],
+        user=settings['POSTGRES_DATABASE_USERNAME'],
+        password=settings['POSTGRES_DATABASE_PASSWORD'],
+    ) as conn:
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        with open("tests/seed/patients.sql", "r") as f:
+            cur1 = conn.cursor()
+            cur1.execute(f.read())
+
+    await run_app(
+        loop, payload, "encounters", mock_url=settings['ENCOUNTERS_PATH']
+    )
+
+
+def get_data(table: str) -> dict:
     with psycopg2.connect(
         database=settings['POSTGRES_DATABASE_NAME'],
         host=settings['POSTGRES_DATABASE_HOST'],
@@ -71,5 +109,7 @@ def get_data() -> dict:
         password=settings['POSTGRES_DATABASE_PASSWORD'],
     ) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT * FROM patients;")
+            cur.execute(
+                sql.SQL("SELECT * FROM {};").format(sql.Identifier(table))
+            )
             return cur.fetchall()
