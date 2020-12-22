@@ -16,8 +16,8 @@ CREATE TABLE encounters (
     id                  SERIAL PRIMARY KEY,
     source_id           TEXT NOT NULL,
     patient_id          INTEGER NOT NULL,
-    start_date          DATE NOT NULL,
-    end_date            DATE NOT NULL,
+    start_date          TIMESTAMPTZ NOT NULL,
+    end_date            TIMESTAMPTZ NOT NULL,
     type_code           TEXT,
     type_code_system    TEXT,
     CONSTRAINT fk_patient FOREIGN KEY (patient_id) REFERENCES patients(id)

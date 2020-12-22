@@ -8,9 +8,12 @@ setup(
         patient-data = app:start
     """,
     install_requires=[
+        'aiocache',
         'aiohttp',
         'asyncpg',
         'asyncpgsa',
+        'ujson',
+        'msgpack',
         'python-dotenv',
         'SQLAlchemy',
     ],
