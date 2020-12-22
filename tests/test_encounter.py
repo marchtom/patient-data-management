@@ -14,7 +14,7 @@ async def test_encounters_single_item_payload(
     payload = [{
         "id": "2",
         "subject": {
-            "reference": "Patient/uuid-1",
+            "reference": "Patient/patient-uuid-1",
         },
         "period": {
             "start": "2011-11-01T00:05:23+04:00",
@@ -83,7 +83,7 @@ async def test_encounters_multiple_items(
         {
             "id": "source-1",
             "subject": {
-                "reference": "Patient/uuid-1",
+                "reference": "Patient/patient-uuid-1",
             },
             "period": {
                 "start": "2011-11-01T00:05:23+04:00",
@@ -93,7 +93,7 @@ async def test_encounters_multiple_items(
         {
             "id": "source-1",
             "subject": {
-                "reference": "Patient/uuid-2",
+                "reference": "Patient/patient-uuid-2",
             },
             "period": {
                 "start": "2011-11-01T00:05:23+04:00",

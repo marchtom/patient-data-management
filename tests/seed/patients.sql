@@ -4,9 +4,9 @@ INSERT INTO patients (
 )
 VALUES (
     7,
-    'uuid-1'
+    'patient-uuid-1'
 ),
 (
     15,
-    'uuid-2'
+    'patient-uuid-2'
 );
