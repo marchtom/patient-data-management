@@ -19,6 +19,7 @@ setup(
             'aioresponses',
             'flake8',
             'mypy',
+            'ndjson'
             'psycopg2-binary',
             'pytest-aiohttp',
             'pytest-asyncio',
