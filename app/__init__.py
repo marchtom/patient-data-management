@@ -57,12 +57,13 @@ class App:
             database=self._settings['POSTGRES_DATABASE_NAME'],
             user=self._settings['POSTGRES_DATABASE_USERNAME'],
             password=self._settings['POSTGRES_DATABASE_PASSWORD'],
-            max_size=self._settings['POSTGRES_CONNECTION_POOL_SIZE'],
+            min_size=self._settings['POSTGRES_MIN_CONNECTION_POOL_SIZE'],
+            max_size=self._settings['POSTGRES_MAX_CONNECTION_POOL_SIZE'],
             loop=self._loop,
         )
 
         self._batcher = patients.Batching(self._pool, self._settings)
-        batcher_task = asyncio.create_task(self._batcher.work())
+        asyncio.create_task(self._batcher.work())
 
         tasks = []
         for i in range(self._settings['QUEUE_WORKERS_AMOUNT']):
@@ -78,8 +79,7 @@ class App:
         for task in tasks:
             task.cancel()
 
-        batcher_task.cancel()
-        await self._batcher.save_batch()
+        await self._batcher.proccess_batch()
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
