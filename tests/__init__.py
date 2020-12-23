@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 from typing import List
 
@@ -65,7 +66,7 @@ async def run_app(
     with aioresponses() as mocked:
         body = ndjson.dumps(payload)
         mocked.get(mock_url, status=200, body=body)
-        test_app = init_app(loop=loop, settings=settings)
+        test_app = init_app(loop=loop, settings=settings, command_line_args=argparse.Namespace(verbose=False))
 
         if entity == "patients":
             task = loop.create_task(test_app.resolve_patients())
