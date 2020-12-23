@@ -24,4 +24,6 @@ settings = dict(
     QUEUE_WORKERS_AMOUNT=int(os.getenv("QUEUE_WORKERS_AMOUNT", 2)),
 
     BATCHER_SLEEP_TIME=int(os.getenv("BATCHER_SLEEP_TIME", 1)),
+
+    CACHE_TTL=int(os.getenv("CACHE_TTL", 30)),
 )
