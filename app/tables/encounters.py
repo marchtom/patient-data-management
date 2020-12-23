@@ -71,6 +71,7 @@ class EncountersBatching(Batcher):
             return await patients.get_patient_id(conn, patient_id_reference)
 
     async def process(self, conn: Connection, item: str) -> None:
+        await super().process(conn, item)
 
         # skip items that are not valid JSON
         try:
