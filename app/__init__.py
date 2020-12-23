@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 class App:
 
-    def __init__(self, loop: asyncio.AbstractEventLoop, settings: dict, command_line_args: argparse.Namespace):
+    def __init__(
+        self, loop: asyncio.AbstractEventLoop, settings: dict,
+        command_line_args: argparse.Namespace,
+    ):
         self._settings = settings
         self._loop = loop
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=settings['MAX_QUEUE_SIZE'])
@@ -201,7 +204,11 @@ class App:
         await self.post_run_stats(pool)
 
 
-def init_app(loop: asyncio.AbstractEventLoop, settings: dict, command_line_args: argparse.Namespace) -> App:
+def init_app(
+    loop: asyncio.AbstractEventLoop,
+    settings: dict,
+    command_line_args: argparse.Namespace,
+) -> App:
     return App(
         loop=loop,
         settings=settings,
