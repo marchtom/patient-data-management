@@ -5,8 +5,10 @@ from typing import Any, List, Optional, Tuple
 
 import sqlalchemy as sa
 from aiocache import cached
+from asyncpg import Record
 from asyncpg.connection import Connection
 from asyncpg.pool import Pool
+from sqlalchemy import func, text
 from sqlalchemy.dialects import postgresql
 
 from app.settings import settings
@@ -44,6 +46,43 @@ async def get_encounter_id(conn: Connection, source_id: str) -> str:
         .with_only_columns([encounters_table.c.id])
     )
     return await conn.fetchval(query)
+
+
+async def popular_start_encounters_days(pool: Pool) -> dict:
+    result_raw = await popular_encounters_days(pool, encounters_table.c.start_date)
+
+    result_list = [dict(row) for row in result_raw]
+    result_dict = {
+        row.get("weekday", "").strip(): row.get("count") for row in result_list
+    }
+
+    return result_dict
+
+
+async def popular_end_encounters_days(pool: Pool) -> dict:
+    result_raw = await popular_encounters_days(pool, encounters_table.c.end_date)
+
+    result_list = [dict(row) for row in result_raw]
+    result_dict = {
+        row.get("weekday", "").strip(): row.get("count") for row in result_list
+    }
+
+    return result_dict
+
+
+async def popular_encounters_days(pool: Pool, column: sa.Column) -> List[Record]:
+    query = (
+        encounters_table.select()
+        .with_only_columns([
+            func.to_char(column, 'Day').label('weekday'),
+            func.count(encounters_table.c.id).label('count'),
+        ])
+        .group_by(text('weekday'))
+        .order_by(text('count DESC'))
+    )
+
+    async with pool.acquire() as conn:
+        return await conn.fetch(query)
 
 
 class EncountersBatching(Batcher):

@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from aiocache import cached
 from asyncpg.connection import Connection
 from asyncpg.pool import Pool
+from sqlalchemy import func
 from sqlalchemy.dialects import postgresql
 
 from app.settings import settings
@@ -39,6 +40,29 @@ procedures_table = sa.Table(
     sa.Column('type_code', postgresql.TEXT, nullable=False),
     sa.Column('type_code_system', postgresql.TEXT, nullable=False),
 )
+
+
+async def most_popular_procedures(pool: Pool) -> dict:
+    query = (
+        procedures_table.select()
+        .with_only_columns([
+            procedures_table.c.type_code,
+            func.count(procedures_table.c.id).label('count'),
+        ])
+        .group_by(procedures_table.c.type_code)
+        .order_by(func.count(procedures_table.c.id).desc())
+        .limit(10)
+    )
+
+    async with pool.acquire() as conn:
+        result_raw = await conn.fetch(query)
+
+    result_list = [dict(row) for row in result_raw]
+    result_dict = {
+        row.get("type_code", ""): row.get("count") for row in result_list
+    }
+
+    return result_dict
 
 
 class ProceduresBatching(Batcher):
