@@ -12,6 +12,7 @@ setup(
         'aiohttp',
         'asyncpg',
         'asyncpgsa',
+        'invoke',
         'ujson',
         'msgpack',
         'python-dotenv',
