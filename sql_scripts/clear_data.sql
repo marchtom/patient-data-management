@@ -1,0 +1,4 @@
+TRUNCATE patients CASCADE;
+TRUNCATE encounters CASCADE;
+TRUNCATE procedures CASCADE;
+TRUNCATE observations CASCADE;

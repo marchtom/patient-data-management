@@ -26,9 +26,10 @@ Requires Python 3.8+.
    `invoke db.schema`
 
 6. Run app  
-   `etl-tool [-v] [-e STRING]`  
-   `-v` runs app in verbose mode  
+   `etl-tool [-c] [-v] [-e STRING]`  
+   `-c` clears database before running app  
    `-e` runs app for single data typ, possible values: {patients, encounters, procedures, observations}  
+   `-v` runs app in verbose mode  
 
 
 ### Extras:

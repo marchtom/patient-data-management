@@ -6,7 +6,9 @@ from typing import Optional
 
 import aiohttp
 import asyncpgsa
+import psycopg2
 from asyncpg.pool import Pool
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from .tables import encounters, observations, patients, procedures
 from .tables.basic_batcher import Batcher
@@ -204,6 +206,19 @@ class App:
         await self.post_run_stats(pool)
 
 
+def clear_data() -> None:
+    with psycopg2.connect(
+        database=settings['POSTGRES_DATABASE_NAME'],
+        host=settings['POSTGRES_DATABASE_HOST'],
+        user=settings['POSTGRES_DATABASE_USERNAME'],
+        password=settings['POSTGRES_DATABASE_PASSWORD'],
+    ) as conn:
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cur1 = conn.cursor()
+        with open("sql_scripts/clear_data.sql", "r") as file:
+            cur1.execute(file.read())
+
+
 def init_app(
     loop: asyncio.AbstractEventLoop,
     settings: dict,
@@ -218,12 +233,19 @@ def init_app(
 
 def start() -> None:
     parser = argparse.ArgumentParser(description='patient data processing')
+    parser.add_argument(
+        '-c', '--clean', action='store_true',
+        help="Clears database before running app, previously stored all data will be lost"
+    )
     parser.add_argument('-v', '--verbose', action='store_true', help="Increased verbosity, DEBUG level logs are shown")
     parser.add_argument(
         '-e', '--entity', choices=["patients", "encounters", "procedures", "observations"],
         help="Run app for single entity.",
     )
     args = parser.parse_args()
+
+    if args.clean:
+        clear_data()
 
     started_at = time.monotonic()
 
