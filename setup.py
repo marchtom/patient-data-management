@@ -1,11 +1,11 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='patient-data',
+    name='etl-tool',
     packages=find_packages('', exclude=['tests']),
     entry_points="""
         [console_scripts]
-        patient-data = app:start
+        etl-tool = app:start
     """,
     install_requires=[
         'aiocache',

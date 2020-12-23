@@ -1,4 +1,4 @@
-# patient-data-management
+# etl-tool-management
 
 Python application for database management and patient data ETL.  
 Requires Python 3.8+.
@@ -26,14 +26,14 @@ Requires Python 3.8+.
    `invoke db.schema`
 
 6. Run app  
-   `patient-data [-v] [-e STRING]`  
+   `etl-tool [-v] [-e STRING]`  
    `-v` runs app in verbose mode  
    `-e` runs app for single data typ, possible values: {patients, encounters, procedures, observations}  
 
 
 ### Extras:
 Run app only for "patients" data with verbose mode:  
-`patient-data -v -e patients`
+`etl-tool -v -e patients`
 
 Recreate database schema (all stored data will be lost):  
 `invoke db.drop db.schema`  
