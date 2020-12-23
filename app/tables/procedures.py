@@ -9,6 +9,8 @@ from asyncpg.connection import Connection
 from asyncpg.pool import Pool
 from sqlalchemy.dialects import postgresql
 
+from app.settings import settings
+
 from .basic_batcher import Batcher
 from .db import metadata
 
@@ -60,12 +62,12 @@ class ProceduresBatching(Batcher):
         return None, None
 
     # TODO: Move cache to redis or any database. In memory cache is not shared between queue workers.
-    @cached(ttl=30)  # type: ignore
+    @cached(ttl=settings['CACHE_TTL'])  # type: ignore
     async def get_patient_id(self, patient_id_reference: str) -> str:
         async with self._pool.acquire() as conn:
             return await patients.get_patient_id(conn, patient_id_reference)
 
-    @cached(ttl=30)  # type: ignore
+    @cached(ttl=settings['CACHE_TTL'])  # type: ignore
     async def get_encounter_id(self, encounter_id_reference: str) -> str:
         async with self._pool.acquire() as conn:
             return await encounters.get_encounter_id(conn, encounter_id_reference)
