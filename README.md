@@ -1,4 +1,4 @@
-# etl-tool-management
+# etl-tool
 
 Python application for database management and patient data ETL.  
 Requires Python 3.8+.
@@ -46,4 +46,33 @@ Linting (flake8 + mypy):
 
 Run all tests:  
 `invoke test`
+
+Sample logs:
+```
+(.venv)  ~/work/patient-data-management(master) etl-tool -v -e patients -c
+[2020-12-23 15:39:14,200 - app - INFO] Resolving Patients
+[2020-12-23 15:39:14,220 - app - DEBUG] Worker queue-0 START
+[2020-12-23 15:39:14,220 - app - DEBUG] Worker queue-1 START
+[2020-12-23 15:39:14,797 - app - DEBUG] EOF reached
+[2020-12-23 15:39:15,213 - app.tables.basic_batcher - DEBUG] 1628 records in this batch, total: 1628
+[2020-12-23 15:39:15,214 - app - INFO] Patients resolving time: 1.0129 s
+- Final Report -
+Batchers statistics:
+	Patients item processed:           1628
+	Patients records inserted:         1628
+	Encounters item processed:            0
+	Encounters records inserted:          0
+	Procedures item processed:            0
+	Procedures records inserted:          0
+	Observations item processed:          0
+	Observations records inserted:        0
+Additional statistics:
+	Patients by gender:
+	              female      828
+	                male      800
+	10 most popular procedures:
+	Most popular start encounter days of week:
+	Most popular end encounter days of week:
+[2020-12-23 15:39:15,264 - app - INFO] TOTAL TIME: 1.0816 s
+```
 
