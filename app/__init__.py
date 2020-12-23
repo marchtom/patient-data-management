@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import logging
 import time
@@ -17,17 +18,24 @@ logger = logging.getLogger(__name__)
 
 class App:
 
-    def __init__(self, loop: asyncio.AbstractEventLoop, settings: dict):
+    def __init__(self, loop: asyncio.AbstractEventLoop, settings: dict, command_line_args: argparse.Namespace):
         self._settings = settings
         self._loop = loop
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=settings['MAX_QUEUE_SIZE'])
+
+        self.command_line_args = command_line_args
 
         self._config_logging()
 
     def _config_logging(self) -> None:
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
+
+        if self.command_line_args.verbose:
+            ch.setLevel(logging.DEBUG)
+        else:
+            ch.setLevel(logging.INFO)
+
         formatter = logging.Formatter('[%(asctime)s - %(name)s - %(levelname)s] %(message)s')
         ch.setFormatter(formatter)
         logger.addHandler(ch)
@@ -86,66 +94,94 @@ class App:
         )
 
     async def resolve_patients(self, pool: Optional[Pool] = None) -> None:
+        logger.info("Resolving Patients")
+        started_at = time.monotonic()
         if pool is None:
             pool = await self.create_pool()
 
         batcher: patients.PatientsBatching = patients.PatientsBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['PATIENTS_PATH'], pool)
+        logger.info(batcher.get_stats())
+        logger.info(f"Patients resolving time: {(time.monotonic() - started_at):.4f} s")
 
     async def resolve_encounters(self, pool: Optional[Pool] = None) -> None:
+        logger.info("Resolving Encounters")
+        started_at = time.monotonic()
         if pool is None:
             pool = await self.create_pool()
 
         batcher: encounters.EncountersBatching = encounters.EncountersBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['ENCOUNTERS_PATH'], pool)
+        logger.info(batcher.get_stats())
+        logger.info(f"Encounters resolving time: {(time.monotonic() - started_at):.4f} s")
 
     async def resolve_procedures(self, pool: Optional[Pool] = None) -> None:
+        logger.info("Resolving Procedures")
+        started_at = time.monotonic()
         if pool is None:
             pool = await self.create_pool()
 
         batcher: procedures.ProceduresBatching = procedures.ProceduresBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['PROCEDURES_PATH'], pool)
+        logger.info(batcher.get_stats())
+        logger.info(f"Procedures resolving time: {(time.monotonic() - started_at):.4f} s")
 
     async def resolve_observations(self, pool: Optional[Pool] = None) -> None:
+        logger.info("Resolving Observations")
+        started_at = time.monotonic()
         if pool is None:
             pool = await self.create_pool()
 
         batcher: observations.ObservationsBatching = observations.ObservationsBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['OBSERVATIONS_PATH'], pool)
+        logger.info(batcher.get_stats())
+        logger.info(f"Observations resolving time: {(time.monotonic() - started_at):.4f} s")
+
+    async def main_single_entity(self, pool: Pool, entity: str) -> None:
+        if entity == "patients":
+            await self.resolve_patients(pool)
+        elif entity == "encounters":
+            await self.resolve_encounters(pool)
+        elif entity == "procedures":
+            await self.resolve_procedures(pool)
+        elif entity == "observations":
+            await self.resolve_observations(pool)
 
     async def main(self) -> None:
         pool = await self.create_pool()
 
-        started_at = time.monotonic()
+        if (entity := self.command_line_args.entity):
+            await self.main_single_entity(pool, entity)
+            return
+
         await self.resolve_patients(pool)
-        logger.info(f"Patients resolving time: {(time.monotonic() - started_at):.4f} s")
-
-        started_at = time.monotonic()
         await self.resolve_encounters(pool)
-        logger.info(f"Encounters resolving time: {(time.monotonic() - started_at):.4f} s")
-
-        started_at = time.monotonic()
         await self.resolve_procedures(pool)
-        logger.info(f"Procedures resolving time: {(time.monotonic() - started_at):.4f} s")
-
-        started_at = time.monotonic()
         await self.resolve_observations(pool)
-        logger.info(f"Observations resolving time: {(time.monotonic() - started_at):.4f} s")
 
 
-def init_app(loop: asyncio.AbstractEventLoop, settings: dict) -> App:
+def init_app(loop: asyncio.AbstractEventLoop, settings: dict, command_line_args: argparse.Namespace) -> App:
     return App(
         loop=loop,
         settings=settings,
+        command_line_args=command_line_args,
     )
 
 
 def start() -> None:
+    parser = argparse.ArgumentParser(description='patient data processing')
+    parser.add_argument('-v', '--verbose', action='store_true', help="Increased verbosity, DEBUG level logs are shown")
+    parser.add_argument(
+        '-e', '--entity', choices=["patients", "encounters", "procedures", "observations"],
+        help="Run app for single entity.",
+    )
+    args = parser.parse_args()
+
     started_at = time.monotonic()
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    app = init_app(loop=loop, settings=settings)
+    app = init_app(loop=loop, settings=settings, command_line_args=args)
     loop.run_until_complete(app.main())
 
     logger.info(f"TOTAL TIME: {(time.monotonic() - started_at):.4f} s")
