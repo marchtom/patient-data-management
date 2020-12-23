@@ -17,7 +17,7 @@ Requires Python 3.8+.
    `pip install -r requirements-dev.txt`  
 
 3. Install app as python module  
-   `pip install .`
+   `pip install -e .`
 
 4. App requires PostgreSQL database, you can run it as docker container  
    `docker-compose up -d`  
