@@ -22,6 +22,7 @@ class App:
         self._settings = settings
         self._loop = loop
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=settings['MAX_QUEUE_SIZE'])
+        self.stats: dict = {}
 
         self.command_line_args = command_line_args
 
@@ -101,7 +102,7 @@ class App:
 
         batcher: patients.PatientsBatching = patients.PatientsBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['PATIENTS_PATH'], pool)
-        logger.info(batcher.get_stats())
+        self.stats['patients'] = batcher.get_stats()
         logger.info(f"Patients resolving time: {(time.monotonic() - started_at):.4f} s")
 
     async def resolve_encounters(self, pool: Optional[Pool] = None) -> None:
@@ -112,7 +113,7 @@ class App:
 
         batcher: encounters.EncountersBatching = encounters.EncountersBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['ENCOUNTERS_PATH'], pool)
-        logger.info(batcher.get_stats())
+        self.stats['encounters'] = batcher.get_stats()
         logger.info(f"Encounters resolving time: {(time.monotonic() - started_at):.4f} s")
 
     async def resolve_procedures(self, pool: Optional[Pool] = None) -> None:
@@ -123,7 +124,7 @@ class App:
 
         batcher: procedures.ProceduresBatching = procedures.ProceduresBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['PROCEDURES_PATH'], pool)
-        logger.info(batcher.get_stats())
+        self.stats['procedures'] = batcher.get_stats()
         logger.info(f"Procedures resolving time: {(time.monotonic() - started_at):.4f} s")
 
     async def resolve_observations(self, pool: Optional[Pool] = None) -> None:
@@ -134,8 +135,47 @@ class App:
 
         batcher: observations.ObservationsBatching = observations.ObservationsBatching(pool, self._settings)
         await self._resolve_data(batcher, self._settings['OBSERVATIONS_PATH'], pool)
-        logger.info(batcher.get_stats())
+        self.stats['observations'] = batcher.get_stats()
         logger.info(f"Observations resolving time: {(time.monotonic() - started_at):.4f} s")
+
+    async def post_run_stats(self, pool: Pool) -> None:
+        self.stats['patients_genders'] = await patients.patients_by_gender(pool)
+        self.stats['most_popular_procedures'] = await procedures.most_popular_procedures(pool)
+        self.stats['popular_start_encounters_days'] = await encounters.popular_start_encounters_days(pool)
+        self.stats['popular_end_encounters_days'] = await encounters.popular_end_encounters_days(pool)
+
+        self.print_final_report()
+
+    def print_final_report(self) -> None:
+        print("- Final Report -")
+
+        print("Batchers statistics:")
+        print(f"\tPatients item processed:       {self.stats.get('patients', {}).get('processed_items', 0):8}")
+        print(f"\tPatients records inserted:     {self.stats.get('patients', {}).get('inserted_records', 0):8}")
+        print(f"\tEncounters item processed:     {self.stats.get('encounters', {}).get('processed_items', 0):8}")
+        print(f"\tEncounters records inserted:   {self.stats.get('encounters', {}).get('inserted_records', 0):8}")
+        print(f"\tProcedures item processed:     {self.stats.get('procedures', {}).get('processed_items', 0):8}")
+        print(f"\tProcedures records inserted:   {self.stats.get('procedures', {}).get('inserted_records', 0):8}")
+        print(f"\tObservations item processed:   {self.stats.get('observations', {}).get('processed_items', 0):8}")
+        print(f"\tObservations records inserted: {self.stats.get('observations', {}).get('inserted_records', 0):8}")
+
+        print("Additional statistics:")
+
+        print("\tPatients by gender:")
+        for item in self.stats['patients_genders'].items():
+            print(f"\t{item[0]:>20} {item[1]:8}")
+
+        print("\t10 most popular procedures:")
+        for item in self.stats['most_popular_procedures'].items():
+            print(f"\t{item[0]:>20} {item[1]:8}")
+
+        print("\tMost popular start encounter days of week:")
+        for item in self.stats['popular_start_encounters_days'].items():
+            print(f"\t{item[0]:>20} {item[1]:8}")
+
+        print("\tMost popular end encounter days of week:")
+        for item in self.stats['popular_end_encounters_days'].items():
+            print(f"\t{item[0]:>20} {item[1]:8}")
 
     async def main_single_entity(self, pool: Pool, entity: str) -> None:
         if entity == "patients":
@@ -152,12 +192,13 @@ class App:
 
         if (entity := self.command_line_args.entity):
             await self.main_single_entity(pool, entity)
-            return
+        else:
+            await self.resolve_patients(pool)
+            await self.resolve_encounters(pool)
+            await self.resolve_procedures(pool)
+            await self.resolve_observations(pool)
 
-        await self.resolve_patients(pool)
-        await self.resolve_encounters(pool)
-        await self.resolve_procedures(pool)
-        await self.resolve_observations(pool)
+        await self.post_run_stats(pool)
 
 
 def init_app(loop: asyncio.AbstractEventLoop, settings: dict, command_line_args: argparse.Namespace) -> App:

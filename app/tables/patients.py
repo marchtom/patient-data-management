@@ -6,6 +6,7 @@ from typing import Any, Final, List, Optional, Tuple
 import sqlalchemy as sa
 from asyncpg.connection import Connection
 from asyncpg.pool import Pool
+from sqlalchemy import func, text
 from sqlalchemy.dialects import postgresql
 
 from .basic_batcher import Batcher
@@ -40,6 +41,28 @@ async def get_patient_id(conn: Connection, source_id: str) -> str:
         .with_only_columns([patients_table.c.id])
     )
     return await conn.fetchval(query)
+
+
+async def patients_by_gender(pool: Pool) -> dict:
+    query = (
+        patients_table.select()
+        .with_only_columns([
+            patients_table.c.gender,
+            func.count(patients_table.c.id).label('count'),
+        ])
+        .group_by(patients_table.c.gender)
+        .order_by(text('count DESC'))
+    )
+
+    async with pool.acquire() as conn:
+        result_raw = await conn.fetch(query)
+
+    result_list = [dict(row) for row in result_raw]
+    result_dict = {
+        row.get("gender", "undisclosed"): row.get("count") for row in result_list
+    }
+
+    return result_dict
 
 
 class PatientsBatching(Batcher):
