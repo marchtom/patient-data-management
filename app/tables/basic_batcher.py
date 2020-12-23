@@ -17,8 +17,10 @@ class Batcher:
         self._valid_batch: List[dict] = []
         self._pool = pool
         self.settings = settings
-        self.total_records_real = 0
         self.table = table
+
+        self.processed_items = 0
+        self.inserted_records = 0
 
     async def work(self) -> None:
         while True:
@@ -29,19 +31,27 @@ class Batcher:
         if self._valid_batch:
             valid_patients_list = copy.deepcopy(self._valid_batch)
             del self._valid_batch[:]
+
             query = (
                 self.table.insert()
                 .values(valid_patients_list)
             )
             async with self._pool.acquire() as conn:
                 res = await conn.execute(query)
+
             res_split = res.split()
             real_insert_count = res_split[2]
-            self.total_records_real += int(real_insert_count)
+            self.inserted_records += int(real_insert_count)
             logger.debug(
                 "%s records in this batch, total: %s",
-                real_insert_count, self.total_records_real,
+                real_insert_count, self.inserted_records,
             )
 
     async def process(self, conn: Connection, item: str) -> None:
-        raise NotImplementedError
+        self.processed_items += 1
+
+    def get_stats(self) -> dict:
+        return {
+            "processed_items": self.processed_items,
+            "inserted_records": self.inserted_records,
+        }

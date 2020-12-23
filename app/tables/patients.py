@@ -69,6 +69,7 @@ class PatientsBatching(Batcher):
         return None, None
 
     async def process(self, conn: Connection, item: str) -> None:
+        await super().process(conn, item)
 
         # skip items that are not valid JSON
         try:

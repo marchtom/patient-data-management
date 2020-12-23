@@ -74,6 +74,7 @@ class ObservationsBatching(Batcher):
             return await encounters.get_encounter_id(conn, encounter_id_reference)
 
     async def process(self, conn: Connection, item: str) -> None:
+        await super().process(conn, item)
 
         # skip items that are not valid JSON
         try:
